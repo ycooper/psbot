@@ -43,6 +43,13 @@ print('ts: ' + d['response']['ts'] + '\n')
 ts = d['response']['ts']
 wait = '25'
 
+q = quote("расписание")
+doc_type = str(1)
+count = str(50)
+#user_response = urlopen('https://api.vk.com/method/docs.search?q=' + q + '&access_token=' + access_token + '&v=' + api_version + "&search_own&count=" + count)
+#ur = json.loads(str(user_response.read(), 'utf-8'))
+#print (ur)
+
 while True:
     response = urlopen(server + '?act=a_check&key=' + key + '&ts=' + ts + '&wait=' + wait)
     r = response.read()
@@ -79,7 +86,7 @@ while True:
                 if (dcurrent['object']['attachments']) or ('geo' in dcurrent['object']) or any(substring in dcurrent['object']['text'].lower() for substring in citation):
                     message = quote(urlopen(Request('http://api.forismatic.com/api/1.0/?method=getQuote&format=text&lang=ru', headers={'User-Agent': 'Mozilla/5.0'})).read().decode("utf-8", "replace"))
 
-                response = urlopen('https://api.vk.com/method/messages.send?user_id='+str(peer_id)+'&random_id='+randuid+'&message='+message+'&access_token='+access_token+'&v='+api_version)
+                response = urlopen('https://api.vk.com/method/messages.send?peer_id='+str(peer_id)+'&random_id='+randuid+'&message='+message+'&access_token='+access_token+'&v='+api_version)
 
                 print()
     ts = d['ts']
