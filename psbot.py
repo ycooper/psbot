@@ -1,4 +1,8 @@
+#!/usr/bin/python3.5
 from urllib.request import Request, urlopen, quote
+from os.path import dirname, abspath
+import http
+import html
 import json
 import time
 import datetime
@@ -22,15 +26,13 @@ Y                   Y                               Y
 
         \nBy 4cpr, 2019\n''')
 
-f = open("access_token", "r")
-access_token = f.read()
+f = open(dirname(abspath(__file__))+"/access_token", "r")
+access_token = f.read().rstrip('\x0a')
 f.close()
 api_version = '5.101'
 group_id = '183091952'
 random.seed()
-
-response = urlopen(
-    'https://api.vk.com/method/groups.getLongPollServer?group_id=' + group_id + '&access_token=' + access_token + '&v=' + api_version)
+response = urlopen('https://api.vk.com/method/groups.getLongPollServer?group_id=' + group_id + '&access_token=' + access_token + '&v=' + api_version)
 d = json.loads(str(response.read(), 'utf-8'))
 # print(d)
 print('key: ' + d['response']['key'])
