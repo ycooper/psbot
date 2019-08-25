@@ -30,14 +30,13 @@ Y                   Y                               Y
 
         \nBy 4cpr, 2019\n''')
 
-file_path_separator = []
-file_path_separator['separator'] = '/'
+file_path_separator = ['/']
 
 
 def get_download_path(separator):
     """Returns the default downloads path for linux or windows"""
     if os.name == 'nt':
-        separator['separator'] = '\\'
+        separator[0] = '\\'
         print(file_path_separator)
         import winreg
         sub_key = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
@@ -46,9 +45,11 @@ def get_download_path(separator):
             location = winreg.QueryValueEx(key, downloads_guid)[0]
         return location
     else:
-        separator['separator'] = '/'
+        separator[0] = '/'
         print(file_path_separator)
-        return os.path.join(os.path.expanduser('~'), 'downloads')
+        #return os.path.join(os.path.expanduser('~'), 'downloads')
+        os.mkdir('/tmp/psbot')
+        return '/tmp/psbot'
 
 
 f = open(dirname(abspath(__file__)) + "/access_token", "r")
@@ -132,6 +133,9 @@ while True:
                 citation = ['цитат', 'цити', 'процит', 'фразеологизм', 'афоризм', 'мотиви', 'мотивац']
                 if (d_current['object']['attachments']) or ('geo' in d_current['object']) or any(
                         substring in d_current['object']['text'].lower() for substring in citation):
+                    assert isinstance(urlopen(
+                        Request('http://api.forismatic.com/api/1.0/?method=getQuote&format=text&lang=ru',
+                                headers={'User-Agent': 'Mozilla/5.0'})).read, object)
                     message = quote(urlopen(
                         Request('http://api.forismatic.com/api/1.0/?method=getQuote&format=text&lang=ru',
                                 headers={'User-Agent': 'Mozilla/5.0'})).read().decode("utf-8", "replace"))
