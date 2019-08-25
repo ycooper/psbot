@@ -1,12 +1,16 @@
 #!/usr/bin/python3.5
-from urllib.request import Request, urlopen, quote
+from urllib.request import Request, urlopen, quote, urlretrieve
 from os.path import dirname, abspath
+from datetime import datetime
 import http
 import html
 import json
 import time
 import datetime
 import random
+import os
+
+from docx_parser import get_schedule
 
 print('''
  .S_sSSs      sSSs   .S_SSSs      sSSs_sSSs    sdSS_SSSSSSbs  
@@ -26,13 +30,33 @@ Y                   Y                               Y
 
         \nBy 4cpr, 2019\n''')
 
-f = open(dirname(abspath(__file__))+"/access_token", "r")
+file_path_separator = []
+file_path_separator['separator'] = '/'
+def get_download_path(separator):
+    """Returns the default downloads path for linux or windows"""
+    if os.name == 'nt':
+        separator['separator'] = '\\'
+        print(file_path_separator)
+        import winreg
+        sub_key = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
+        downloads_guid = '{374DE290-123F-4565-9164-39C4925E467B}'
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_key) as key:
+            location = winreg.QueryValueEx(key, downloads_guid)[0]
+        return location
+    else:
+        separator['separator'] = '/'
+        print(file_path_separator)
+        return os.path.join(os.path.expanduser('~'), 'downloads')
+
+
+f = open(dirname(abspath(__file__)) + "/access_token", "r")
 access_token = f.read().rstrip('\x0a')
 f.close()
 api_version = '5.101'
 group_id = '183091952'
 random.seed()
-response = urlopen('https://api.vk.com/method/groups.getLongPollServer?group_id=' + group_id + '&access_token=' + access_token + '&v=' + api_version)
+response = urlopen(
+    'https://api.vk.com/method/groups.getLongPollServer?group_id=' + group_id + '&access_token=' + access_token + '&v=' + api_version)
 d = json.loads(str(response.read(), 'utf-8'))
 # print(d)
 print('key: ' + d['response']['key'])
@@ -45,10 +69,29 @@ wait = '25'
 
 q = quote("расписание")
 doc_type = str(1)
-count = str(50)
-#user_response = urlopen('https://api.vk.com/method/docs.search?q=' + q + '&access_token=' + access_token + '&v=' + api_version + "&search_own&count=" + count)
-#ur = json.loads(str(user_response.read(), 'utf-8'))
-#print (ur)
+count = str(1000)
+download_path = get_download_path(file_path_separator)
+user_response = urlopen(
+    'https://api.vk.com/method/docs.search?q=' + q + '&access_token=' + access_token + '&v=' + api_version + "&search_own&count=" + count)
+ur = json.loads(str(user_response.read(), 'utf-8'))
+# print(ur)
+print("Searching schedule files (.docx) in {0} results...".format(len(ur['response']['items'])))
+f_counter = 0
+for item in ur['response']['items']:
+    if item['owner_id'] == -int(group_id):
+        print("Title: {0}".format(item['title']))
+        value = datetime.datetime.fromtimestamp(item['date'])
+        print("Upload time: {0}".format(value))
+        print("Size: {0:.2f} KB".format(item['size'] * pow(2, -10)))
+        print("url: {0}".format(item['url']))
+        print()
+        f_counter += 1
+        print("Separator: {0}".format(file_path_separator))
+        file_path = download_path + file_path_separator[0] + item['title']
+        print(file_path)
+        urlretrieve(item['url'], file_path)
+print("{0} schedule files found".format(f_counter))
+print("Saving files to: {0}".format(download_path))
 
 while True:
     response = urlopen(server + '?act=a_check&key=' + key + '&ts=' + ts + '&wait=' + wait)
@@ -56,7 +99,7 @@ while True:
     d = json.loads(str(r, 'utf-8'))
     if 'updates' in d:
         for dcurrent in d['updates']:
-            if dcurrent['type'] == 'message_new':
+            if dcurrent['owner_id'] == -int(group_id):
                 print(r)
 
                 uid = str(dcurrent['object']['from_id'])
@@ -80,13 +123,19 @@ while True:
 
                 current_class = ['пара', 'сейчас', 'сколько врем', 'который час']
                 if any(substring in dcurrent['object']['text'].lower() for substring in current_class):
-                    message = quote(day_of_week[datetime.datetime.today().weekday()]+'\n'+datetime.datetime.today().strftime("%Y-%m-%d %H.%M.%S"))
+                    message = quote(
+                        day_of_week[datetime.datetime.today().weekday()] + '\n' + datetime.datetime.today().strftime(
+                            "%Y-%m-%d %H.%M.%S"))
 
                 citation = ['цитат', 'цити', 'процит', 'фразеологизм', 'афоризм', 'мотиви', 'мотивац']
-                if (dcurrent['object']['attachments']) or ('geo' in dcurrent['object']) or any(substring in dcurrent['object']['text'].lower() for substring in citation):
-                    message = quote(urlopen(Request('http://api.forismatic.com/api/1.0/?method=getQuote&format=text&lang=ru', headers={'User-Agent': 'Mozilla/5.0'})).read().decode("utf-8", "replace"))
+                if (dcurrent['object']['attachments']) or ('geo' in dcurrent['object']) or any(
+                        substring in dcurrent['object']['text'].lower() for substring in citation):
+                    message = quote(urlopen(
+                        Request('http://api.forismatic.com/api/1.0/?method=getQuote&format=text&lang=ru',
+                                headers={'User-Agent': 'Mozilla/5.0'})).read().decode("utf-8", "replace"))
 
-                response = urlopen('https://api.vk.com/method/messages.send?peer_id='+str(peer_id)+'&random_id='+randuid+'&message='+message+'&access_token='+access_token+'&v='+api_version)
+                response = urlopen('https://api.vk.com/method/messages.send?peer_id=' + str(
+                    peer_id) + '&random_id=' + randuid + '&message=' + message + '&access_token=' + access_token + '&v=' + api_version)
 
                 print()
     ts = d['ts']
