@@ -32,6 +32,8 @@ Y                   Y                               Y
 
 file_path_separator = []
 file_path_separator['separator'] = '/'
+
+
 def get_download_path(separator):
     """Returns the default downloads path for linux or windows"""
     if os.name == 'nt':
@@ -98,11 +100,11 @@ while True:
     r = response.read()
     d = json.loads(str(r, 'utf-8'))
     if 'updates' in d:
-        for dcurrent in d['updates']:
-            if dcurrent['owner_id'] == -int(group_id):
+        for d_current in d['updates']:
+            if d_current['type'] == "message_new":
                 print(r)
 
-                uid = str(dcurrent['object']['from_id'])
+                uid = str(d_current['object']['from_id'])
                 randuid = str(random.randint(0, 2147483647))
                 user_response = urlopen(
                     'https://api.vk.com/method/users.get?user_ids=' + uid + '&access_token=' + access_token + '&v=' + api_version)
@@ -110,26 +112,26 @@ while True:
                 # print (ur)
                 print('Message from: ' + ur['response'][0]['first_name'] + ' ' + ur['response'][0][
                     'last_name'] + ' ' + uid)
-                print('Message: \"' + dcurrent['object']['text'] + '\"')
-                if (dcurrent['object']['attachments']):
+                print('Message: \"' + d_current['object']['text'] + '\"')
+                if d_current['object']['attachments']:
                     print('Attachments:')
-                    for att in dcurrent['object']['attachments']:
+                    for att in d_current['object']['attachments']:
                         print(att['type'])
-                peer_id = dcurrent['object']['peer_id']
+                peer_id = d_current['object']['peer_id']
                 print('Peer id: ' + str(peer_id))
 
                 message = quote('Список доступных комманд:\n\n - \"Какая сейчас пара?\"\n - \"Процитируй что-нибудь\"')
                 day_of_week = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 
                 current_class = ['пара', 'сейчас', 'сколько врем', 'который час']
-                if any(substring in dcurrent['object']['text'].lower() for substring in current_class):
+                if any(substring in d_current['object']['text'].lower() for substring in current_class):
                     message = quote(
                         day_of_week[datetime.datetime.today().weekday()] + '\n' + datetime.datetime.today().strftime(
                             "%Y-%m-%d %H.%M.%S"))
 
                 citation = ['цитат', 'цити', 'процит', 'фразеологизм', 'афоризм', 'мотиви', 'мотивац']
-                if (dcurrent['object']['attachments']) or ('geo' in dcurrent['object']) or any(
-                        substring in dcurrent['object']['text'].lower() for substring in citation):
+                if (d_current['object']['attachments']) or ('geo' in d_current['object']) or any(
+                        substring in d_current['object']['text'].lower() for substring in citation):
                     message = quote(urlopen(
                         Request('http://api.forismatic.com/api/1.0/?method=getQuote&format=text&lang=ru',
                                 headers={'User-Agent': 'Mozilla/5.0'})).read().decode("utf-8", "replace"))
