@@ -17,6 +17,6 @@ def get_schedule(file_name):
             continue
         row_data = dict(zip(keys, text))
         data.append(row_data)
-        print(data)
+        #print(data)
 
     return data

@@ -31,13 +31,15 @@ Y                   Y                               Y
         \nBy 4cpr, 2019\n''')
 
 file_path_separator = ['/']
+schedule = []
+global_schedule = []
+day_of_week = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 
 
 def get_download_path(separator):
     """Returns the default downloads path for linux or windows"""
     if os.name == 'nt':
         separator[0] = '\\'
-        print(file_path_separator)
         import winreg
         sub_key = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
         downloads_guid = '{374DE290-123F-4565-9164-39C4925E467B}'
@@ -46,10 +48,40 @@ def get_download_path(separator):
         return location
     else:
         separator[0] = '/'
-        print(file_path_separator)
         #return os.path.join(os.path.expanduser('~'), 'downloads')
-        os.mkdir('/tmp/psbot')
-        return '/tmp/psbot'
+        dir_name = '/tmp/psbot'
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+        return dir_name
+
+
+def creation_date(path_to_file):
+    if os.name == 'nt':
+        return os.path.getctime(path_to_file)
+    else:
+        stat = os.stat(path_to_file)
+        try:
+            return stat.st_birthtime
+        except AttributeError:
+            return stat.st_mtime
+
+
+def parse_schedule(schedule):
+    last_hour = 900
+    day = 0
+    a_count = 0
+    b_count = 0
+    for hour in schedule:
+        if int(hour['']) < last_hour:
+            day += 1
+            global_schedule.append([day])
+            global_schedule[day] = {}
+        last_hour = int(hour[''])
+        del hour['']
+        for key, value in hour.items():
+            print(key)
+            print(value)
+        print(global_schedule)
 
 
 f = open(dirname(abspath(__file__)) + "/access_token", "r")
@@ -80,6 +112,7 @@ ur = json.loads(str(user_response.read(), 'utf-8'))
 # print(ur)
 print("Searching schedule files (.docx) in {0} results...".format(len(ur['response']['items'])))
 f_counter = 0
+fd_counter = 0
 for item in ur['response']['items']:
     if item['owner_id'] == -int(group_id):
         print("Title: {0}".format(item['title']))
@@ -89,11 +122,24 @@ for item in ur['response']['items']:
         print("url: {0}".format(item['url']))
         print()
         f_counter += 1
-        print("Separator: {0}".format(file_path_separator))
         file_path = download_path + file_path_separator[0] + item['title']
         print(file_path)
-        urlretrieve(item['url'], file_path)
+        print("Remote file date: {0}".format(datetime.datetime.fromtimestamp(item['date'])))
+        if os.path.isfile(file_path):
+            print("Local file date: {0}".format(datetime.datetime.fromtimestamp(int(creation_date(file_path)))))
+            if item['date'] > int(creation_date(file_path)):
+                urlretrieve(item['url'], file_path)
+                fd_counter += 1
+        else:
+            urlretrieve(item['url'], file_path)
+            fd_counter += 1
+        schedule = get_schedule(file_path)
+        print(schedule)
+        parse_schedule(schedule)
+
+print()
 print("{0} schedule files found".format(f_counter))
+print("{0} files were downloaded".format(fd_counter))
 print("Saving files to: {0}".format(download_path))
 
 while True:
@@ -122,7 +168,6 @@ while True:
                 print('Peer id: ' + str(peer_id))
 
                 message = quote('Список доступных комманд:\n\n - \"Какая сейчас пара?\"\n - \"Процитируй что-нибудь\"')
-                day_of_week = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 
                 current_class = ['пара', 'сейчас', 'сколько врем', 'который час']
                 if any(substring in d_current['object']['text'].lower() for substring in current_class):
