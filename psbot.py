@@ -137,7 +137,8 @@ def get_current_pair(peer_id = 0):
             class_hour = int(str(hour['start_time'])[:-2])
             class_minute = int(str(hour['start_time'])[-2:])
             class_start = datetime.time(class_hour, class_minute)
-            current_delta = loc_dt_now.replace(tzinfo=None) - datetime.datetime.combine(loc_dt, class_start)
+            print(loc_dt_now.replace(tzinfo=None))
+            current_delta = loc_dt_now.replace(tzinfo=None) - datetime.datetime.combine(loc_dt.replace(tzinfo=None), class_start)
             if current_delta < delta:
                 td1 = datetime.timedelta(0, 0, 0, 0, class_minute, class_hour)
                 beginning = ':'.join(str(td1).split(':')[:2])
