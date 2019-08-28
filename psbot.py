@@ -137,9 +137,8 @@ def get_current_pair(peer_id = 0):
             class_hour = int(str(hour['start_time'])[:-2])
             class_minute = int(str(hour['start_time'])[-2:])
             class_start = datetime.time(class_hour, class_minute)
-            print(loc_dt_now.replace(tzinfo=None))
             current_delta = loc_dt_now.replace(tzinfo=None) - datetime.datetime.combine(loc_dt.replace(tzinfo=None), class_start)
-            if current_delta < delta:
+            if current_delta < delta and current_delta > -delta:
                 td1 = datetime.timedelta(0, 0, 0, 0, class_minute, class_hour)
                 beginning = ':'.join(str(td1).split(':')[:2])
                 td2 = datetime.timedelta(0, 0, 0, 0, class_minute + 30, class_hour + 1)
@@ -322,6 +321,7 @@ while True:
                 options = ['настройки', 'опции', 'options', 'settings']
                 if any(substring in d_current['object']['text'].lower() for substring in options):
                     settings_flag = True
+                    message = "Выберите группы для отображения расписания"
 
                 print("Message to user:\n{0}".format(unquote(message)))
                 url = "https://api.vk.com/method/messages.send"
