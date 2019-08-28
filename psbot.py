@@ -2,6 +2,7 @@
 from urllib.request import Request, urlopen, quote, unquote, urlretrieve
 import urllib.parse
 from os.path import dirname, abspath
+from pytz import timezone
 import json
 import time
 import datetime
@@ -116,10 +117,11 @@ def parse_schedule(schedule):
 
 
 def get_current_pair(peer_id = 0):
-    day = datetime.datetime.today().weekday()
+    day = datetime.datetime.today().astimezone(timezone('Europe/Moscow')).weekday()
     delta = datetime.timedelta(0, 0, 0, 0, 30, 1)
     class_current_flag = False
-    s_message = day_of_week[datetime.datetime.today().weekday()] + '\n' + datetime.datetime.today().strftime(
+    s_message = day_of_week[datetime.datetime.today().astimezone(timezone('Europe/Moscow')).weekday()] + '\n' +\
+                datetime.datetime.today().astimezone(timezone('Europe/Moscow')).strftime(
             "%Y-%m-%d %H.%M.%S")
     if not day < len(global_schedule):
         s_message = s_message + "\nВыходной день, пар нет"
@@ -128,7 +130,8 @@ def get_current_pair(peer_id = 0):
             class_hour = int(str(hour['start_time'])[:-2])
             class_minute = int(str(hour['start_time'])[-2:])
             class_start = datetime.time(class_hour, class_minute)
-            current_delta = datetime.datetime.now() - datetime.datetime.combine(datetime.datetime.today(), class_start)
+            current_delta = datetime.datetime.now() - datetime.datetime.combine(datetime.datetime.today().astimezone(
+                timezone('Europe/Moscow')), class_start)
             if current_delta < delta:
                 td1 = datetime.timedelta(0, 0, 0, 0, class_minute, class_hour)
                 beginning = ':'.join(str(td1).split(':')[:2])
@@ -258,7 +261,6 @@ while True:
                 if peer_id not in user_settings:
                     user_settings[peer_id] = keyboard
                     user_filters[peer_id] = []
-                    print("User settings:\n{0}".format(keyboard))
                 # Updating keyboard settings from keyboard event
                 if 'payload' in d_current['object']:
                     settings_flag = True
@@ -267,7 +269,6 @@ while True:
                         message = "Выберите группы для отображения расписания"
                         break
                     for row in user_settings[peer_id]['buttons']:
-                        print("Current row: {0}".format(row))
                         for button in row:
                             l_group = json.loads(button['action']['payload'])['button']
                             r_group = json.loads(d_current['object']['payload'])['button']
@@ -315,7 +316,7 @@ while True:
                 if any(substring in d_current['object']['text'].lower() for substring in options):
                     settings_flag = True
 
-                print("Message to user: {0}".format(unquote(message)))
+                print("Message to user:\n{0}".format(unquote(message)))
                 url = "https://api.vk.com/method/messages.send"
 
                 post_request_params = {
