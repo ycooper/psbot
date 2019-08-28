@@ -117,11 +117,17 @@ def parse_schedule(schedule):
 
 
 def get_current_pair(peer_id = 0):
-    day = datetime.datetime.today().astimezone(timezone('Europe/Moscow')).weekday()
+    gerzone = timezone('Europe/Berlin')
+    loc_dt = gerzone.localize(datetime.datetime.today()).astimezone(timezone('Europe/Moscow'))
+    #print("local dt: {0}: ".format(loc_dt))
+    loc_dt_now = gerzone.localize(datetime.datetime.now()).astimezone(timezone('Europe/Moscow'))
+    #print("local dt now: {0}: ".format(loc_dt_now))
+    #day = datetime.datetime.today().astimezone(timezone('Europe/Moscow')).weekday()
+    day = loc_dt.weekday()
     delta = datetime.timedelta(0, 0, 0, 0, 30, 1)
     class_current_flag = False
-    s_message = day_of_week[datetime.datetime.today().astimezone(timezone('Europe/Moscow')).weekday()] + '\n' +\
-                datetime.datetime.today().astimezone(timezone('Europe/Moscow')).strftime(
+    s_message = day_of_week[loc_dt.weekday()] + '\n' +\
+                loc_dt.strftime(
             "%Y-%m-%d %H.%M.%S")
     if not day < len(global_schedule):
         s_message = s_message + "\nВыходной день, пар нет"
@@ -130,8 +136,7 @@ def get_current_pair(peer_id = 0):
             class_hour = int(str(hour['start_time'])[:-2])
             class_minute = int(str(hour['start_time'])[-2:])
             class_start = datetime.time(class_hour, class_minute)
-            current_delta = datetime.datetime.now() - datetime.datetime.combine(datetime.datetime.today().astimezone(
-                timezone('Europe/Moscow')), class_start)
+            current_delta = loc_dt_now.replace(tzinfo=None) - datetime.datetime.combine(loc_dt, class_start)
             if current_delta < delta:
                 td1 = datetime.timedelta(0, 0, 0, 0, class_minute, class_hour)
                 beginning = ':'.join(str(td1).split(':')[:2])
