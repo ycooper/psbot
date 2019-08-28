@@ -3,6 +3,7 @@ from urllib.request import Request, urlopen, quote, unquote, urlretrieve
 import urllib.parse
 from os.path import dirname, abspath
 from pytz import timezone
+from pytz import all_timezones
 import json
 import time
 import datetime
@@ -117,10 +118,12 @@ def parse_schedule(schedule):
 
 
 def get_current_pair(peer_id = 0):
-    gerzone = timezone('Europe/Berlin')
-    loc_dt = gerzone.localize(datetime.datetime.today()).astimezone(timezone('Europe/Moscow'))
+    gerzone = timezone('Etc/GMT+6')
+    loc_dt = gerzone.localize(datetime.datetime.today()).astimezone(timezone('Etc/GMT+3'))
+    for zone in all_timezones:
+        print(zone)
     #print("local dt: {0}: ".format(loc_dt))
-    loc_dt_now = gerzone.localize(datetime.datetime.now()).astimezone(timezone('Europe/Moscow'))
+    loc_dt_now = gerzone.localize(datetime.datetime.now()).astimezone(timezone('Etc/GMT+3'))
     #print("local dt now: {0}: ".format(loc_dt_now))
     #day = datetime.datetime.today().astimezone(timezone('Europe/Moscow')).weekday()
     day = loc_dt.weekday()
