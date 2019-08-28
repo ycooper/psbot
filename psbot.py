@@ -1,9 +1,6 @@
 #!/usr/bin/python3.5
 from urllib.request import Request, urlopen, quote, urlretrieve
 from os.path import dirname, abspath
-from datetime import datetime
-import http
-import html
 import json
 import time
 import datetime
@@ -32,7 +29,7 @@ Y                   Y                               Y
 
 file_path_separator = ['/']
 schedule = []
-global_schedule = []
+global_schedule = [[{}]]
 day_of_week = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 
 
@@ -48,7 +45,7 @@ def get_download_path(separator):
         return location
     else:
         separator[0] = '/'
-        #return os.path.join(os.path.expanduser('~'), 'downloads')
+        # return os.path.join(os.path.expanduser('~'), 'downloads')
         dir_name = '/tmp/psbot'
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
@@ -67,23 +64,76 @@ def creation_date(path_to_file):
 
 
 def parse_schedule(schedule):
-    last_hour = 900
+    global global_schedule
+    last_hour = 100 # It is actually time like 01:00 in int
+    # Counter to store hours as a list
+    h_counter = 0
     day = 0
-    a_count = 0
-    b_count = 0
+    # print("")
+    global_schedule[0] = [{}]
     for hour in schedule:
-        if int(hour['']) < last_hour:
-            day += 1
-            global_schedule.append([day])
-            global_schedule[day] = {}
-        last_hour = int(hour[''])
-        del hour['']
+        # print(hour)
         for key, value in hour.items():
-            print(key)
-            print(value)
-        print(global_schedule)
+            if key == '':
+                """
+                print("")
+                print("Hours in file: {0}".format(str(value)[:-2]))
+                print("Last hour: {0}".format(str(last_hour)[:-2]))
+                print("Day: {0}".format(day))
+                """
+                if int(str(value)[:-2]) < int(str(last_hour)[:-2]):
+                    day += 1
+                    h_counter = 0
+                    # print("NEW DAY #{0}".format(day))
+                    global_schedule.append([{}])
+                elif int(str(value)[:-2]) > int(str(last_hour)[:-2]):
+                    # print("HOUR INCREASED")
+                    h_counter += 1
+                    global_schedule[day].append({})
+                global_schedule[day][h_counter]['start_time'] = value
+                # print("Writing start time: {0}".format(global_schedule[day][h_counter]))
+                last_hour = value
+            else:
+                global_schedule[day][h_counter][key] = value
+                """
+                print("{0} на паре: {1}".format(key, value))
+                print("Hour counter: {0}".format(h_counter))
+                print("Current day: {0}".format(global_schedule[day]))
+                print("{0} days".format(len(global_schedule)))
+                print("{0} hours".format(len(global_schedule[day])))
+                print("Attempting to write global_schedule[{0}][{1}]".format(day, h_counter))
+                print("")
+        print("")
+    print("global_schedule:")
+    print(global_schedule)
+    """
 
 
+def get_current_pair():
+    day = datetime.datetime.today().weekday()
+    delta = datetime.timedelta(0, 0, 0, 0, 30, 1)
+    s_message = day_of_week[datetime.datetime.today().weekday()] + '\n' + datetime.datetime.today().strftime(
+            "%Y-%m-%d %H.%M.%S")
+    if not day < len(global_schedule):
+        s_message = s_message + "\nВыходной день, пар нет"
+    else:
+        for hour in global_schedule[day]:
+            class_hour = int(str(hour['start_time'])[:-2])
+            class_minute = int(str(hour['start_time'])[-2:])
+            current_delta = datetime.datetime.now() - datetime.datetime.combine(datetime.datetime.today(), datetime.time(
+                class_hour, class_minute))
+            if current_delta < delta:
+                if current_delta >= datetime.timedelta(0):
+                    s_message = s_message + "\nТекущая пара:"
+                else:
+                    if -current_delta < delta:
+                        s_message = s_message + "\nСледующая пара:"
+                for k, v in hour.items():
+                    if k != 'start_time':
+                        s_message = s_message + "\n{0}: {1}".format(k, v)
+    return quote(s_message)
+
+# Connecting to Long Poll server
 f = open(dirname(abspath(__file__)) + "/access_token", "r")
 access_token = f.read().rstrip('\x0a')
 f.close()
@@ -102,6 +152,7 @@ print('ts: ' + d['response']['ts'] + '\n')
 ts = d['response']['ts']
 wait = '25'
 
+# Searcing vk for schedule in group
 q = quote("расписание")
 doc_type = str(1)
 count = str(1000)
@@ -110,6 +161,8 @@ user_response = urlopen(
     'https://api.vk.com/method/docs.search?q=' + q + '&access_token=' + access_token + '&v=' + api_version + "&search_own&count=" + count)
 ur = json.loads(str(user_response.read(), 'utf-8'))
 # print(ur)
+
+# Filtering search results
 print("Searching schedule files (.docx) in {0} results...".format(len(ur['response']['items'])))
 f_counter = 0
 fd_counter = 0
@@ -125,6 +178,8 @@ for item in ur['response']['items']:
         file_path = download_path + file_path_separator[0] + item['title']
         print(file_path)
         print("Remote file date: {0}".format(datetime.datetime.fromtimestamp(item['date'])))
+
+        # Downloading schedule file
         if os.path.isfile(file_path):
             print("Local file date: {0}".format(datetime.datetime.fromtimestamp(int(creation_date(file_path)))))
             if item['date'] > int(creation_date(file_path)):
@@ -134,13 +189,15 @@ for item in ur['response']['items']:
             urlretrieve(item['url'], file_path)
             fd_counter += 1
         schedule = get_schedule(file_path)
-        print(schedule)
+        # print(schedule)
+        print('PARSING...')
         parse_schedule(schedule)
 
 print()
 print("{0} schedule files found".format(f_counter))
 print("{0} files were downloaded".format(fd_counter))
 print("Saving files to: {0}".format(download_path))
+get_current_pair()
 
 while True:
     response = urlopen(server + '?act=a_check&key=' + key + '&ts=' + ts + '&wait=' + wait)
@@ -171,9 +228,7 @@ while True:
 
                 current_class = ['пара', 'сейчас', 'сколько врем', 'который час']
                 if any(substring in d_current['object']['text'].lower() for substring in current_class):
-                    message = quote(
-                        day_of_week[datetime.datetime.today().weekday()] + '\n' + datetime.datetime.today().strftime(
-                            "%Y-%m-%d %H.%M.%S"))
+                    message = get_current_pair()
 
                 citation = ['цитат', 'цити', 'процит', 'фразеологизм', 'афоризм', 'мотиви', 'мотивац']
                 if (d_current['object']['attachments']) or ('geo' in d_current['object']) or any(

@@ -5,6 +5,7 @@ from docx.api import Document
 def get_schedule(file_name):
     document = Document(file_name)
     table = document.tables[0]
+    #print(table)
 
     data = []
 
@@ -17,6 +18,6 @@ def get_schedule(file_name):
             continue
         row_data = dict(zip(keys, text))
         data.append(row_data)
-        #print(data)
 
+    #print(data)
     return data
