@@ -1,5 +1,6 @@
 #!/usr/bin/python3.5
-from urllib.request import Request, urlopen, quote, urlretrieve
+from urllib.request import Request, urlopen, quote, unquote, urlretrieve
+import urllib.parse
 from os.path import dirname, abspath
 import json
 import time
@@ -31,6 +32,9 @@ file_path_separator = ['/']
 schedule = []
 global_schedule = [[{}]]
 day_of_week = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+groups = []
+user_settings = {}
+user_filters = {}
 
 
 def get_download_path(separator):
@@ -94,6 +98,8 @@ def parse_schedule(schedule):
                 # print("Writing start time: {0}".format(global_schedule[day][h_counter]))
                 last_hour = value
             else:
+                if key not in groups:
+                    groups.append(key)
                 global_schedule[day][h_counter][key] = value
                 """
                 print("{0} на паре: {1}".format(key, value))
@@ -109,9 +115,10 @@ def parse_schedule(schedule):
     """
 
 
-def get_current_pair():
+def get_current_pair(peer_id = 0):
     day = datetime.datetime.today().weekday()
     delta = datetime.timedelta(0, 0, 0, 0, 30, 1)
+    class_current_flag = False
     s_message = day_of_week[datetime.datetime.today().weekday()] + '\n' + datetime.datetime.today().strftime(
             "%Y-%m-%d %H.%M.%S")
     if not day < len(global_schedule):
@@ -120,17 +127,26 @@ def get_current_pair():
         for hour in global_schedule[day]:
             class_hour = int(str(hour['start_time'])[:-2])
             class_minute = int(str(hour['start_time'])[-2:])
-            current_delta = datetime.datetime.now() - datetime.datetime.combine(datetime.datetime.today(), datetime.time(
-                class_hour, class_minute))
+            class_start = datetime.time(class_hour, class_minute)
+            current_delta = datetime.datetime.now() - datetime.datetime.combine(datetime.datetime.today(), class_start)
             if current_delta < delta:
+                td1 = datetime.timedelta(0, 0, 0, 0, class_minute, class_hour)
+                beginning = ':'.join(str(td1).split(':')[:2])
+                td2 = datetime.timedelta(0, 0, 0, 0, class_minute + 30, class_hour + 1)
+                ending = ':'.join(str(td2).split(':')[:2])
                 if current_delta >= datetime.timedelta(0):
-                    s_message = s_message + "\nТекущая пара:"
+                    s_message = s_message + "\nТекущая пара ({0} - {1}):".format(beginning, ending)
                 else:
                     if -current_delta < delta:
-                        s_message = s_message + "\nСледующая пара:"
+                        s_message = s_message + "\nСледующая пара ({0} - {1}):".format(beginning, ending)
                 for k, v in hour.items():
                     if k != 'start_time':
-                        s_message = s_message + "\n{0}: {1}".format(k, v)
+                        if k in user_filters[peer_id] or peer_id == 0 or peer_id not in user_filters:
+                            s_message = s_message + "\n{0}: {1}".format(k, v)
+                            class_current_flag = True
+        if not class_current_flag:
+            s_message = s_message + "\nУчебный день окончен"
+
     return quote(s_message)
 
 # Connecting to Long Poll server
@@ -189,29 +205,88 @@ for item in ur['response']['items']:
             urlretrieve(item['url'], file_path)
             fd_counter += 1
         schedule = get_schedule(file_path)
-        # print(schedule)
-        print('PARSING...')
+        print('Parsing...')
         parse_schedule(schedule)
 
+user_filters[0] = groups
 print()
 print("{0} schedule files found".format(f_counter))
 print("{0} files were downloaded".format(fd_counter))
 print("Saving files to: {0}".format(download_path))
 get_current_pair()
+print("Parsed schedule for groups: \n{0}".format(groups))
+
+
+empty_keyboard = {
+    'one_time': True,
+    'buttons': [[{}]]
+}
+keyboard = empty_keyboard.copy()
+keyboard['one_time'] = False
+g_counter = 0
+row_counter = 0
+keyboard['buttons'][0].pop()
+for group in groups:
+    if g_counter == 4:
+        keyboard['buttons'].append([])
+        row_counter += 1
+        g_counter = 0
+    keyboard['buttons'][row_counter].append({
+        'action': {
+            'type': 'text',
+            "payload": "{\"button\": \"" + group + "\"}",
+            'label': group
+        },
+        'color': 'secondary'
+    })
+    g_counter += 1
 
 while True:
     response = urlopen(server + '?act=a_check&key=' + key + '&ts=' + ts + '&wait=' + wait)
     r = response.read()
     d = json.loads(str(r, 'utf-8'))
+    settings_flag = False
     if 'updates' in d:
         for d_current in d['updates']:
             if d_current['type'] == "message_new":
-                print(r)
+                #print(r)
+                message = quote('Список доступных комманд:\n\n - \"Какая сейчас пара?\"\n - "Настройки"\n - \"Процитируй что-нибудь\"')
+                peer_id = d_current['object']['peer_id']
+                print('Peer id: ' + str(peer_id))
+
+                # Checking user keyboard settings
+                if peer_id not in user_settings:
+                    user_settings[peer_id] = keyboard
+                    user_filters[peer_id] = []
+                    print("User settings:\n{0}".format(keyboard))
+                # Updating keyboard settings from keyboard event
+                if 'payload' in d_current['object']:
+                    settings_flag = True
+                    print("PAYLOAD received: {0}".format(d_current['object']['payload']))
+                    if 'command' in json.loads(d_current['object']['payload']):
+                        message = "Выберите группы для отображения расписания"
+                        break
+                    for row in user_settings[peer_id]['buttons']:
+                        print("Current row: {0}".format(row))
+                        for button in row:
+                            l_group = json.loads(button['action']['payload'])['button']
+                            r_group = json.loads(d_current['object']['payload'])['button']
+                            if l_group == r_group:
+                                if button['color'] != 'primary':
+                                    button['color'] = 'primary'
+                                    message = quote("Включено отображение расписания группы {0}".format(l_group))
+                                    user_filters[peer_id].append(l_group)
+                                else:
+                                    button['color'] = 'secondary'
+                                    message = quote("Отключено отображение расписания группы {0}".format(r_group))
+                                    if l_group in user_filters[peer_id]:
+                                        user_filters[peer_id].remove(l_group)
 
                 uid = str(d_current['object']['from_id'])
                 randuid = str(random.randint(0, 2147483647))
                 user_response = urlopen(
-                    'https://api.vk.com/method/users.get?user_ids=' + uid + '&access_token=' + access_token + '&v=' + api_version)
+                    'https://api.vk.com/method/users.get?user_ids=' + uid + '&access_token=' + access_token + '&v='
+                    + api_version)
                 ur = json.loads(str(user_response.read(), 'utf-8'))
                 # print (ur)
                 print('Message from: ' + ur['response'][0]['first_name'] + ' ' + ur['response'][0][
@@ -221,14 +296,10 @@ while True:
                     print('Attachments:')
                     for att in d_current['object']['attachments']:
                         print(att['type'])
-                peer_id = d_current['object']['peer_id']
-                print('Peer id: ' + str(peer_id))
-
-                message = quote('Список доступных комманд:\n\n - \"Какая сейчас пара?\"\n - \"Процитируй что-нибудь\"')
 
                 current_class = ['пара', 'сейчас', 'сколько врем', 'который час']
                 if any(substring in d_current['object']['text'].lower() for substring in current_class):
-                    message = get_current_pair()
+                    message = get_current_pair(peer_id)
 
                 citation = ['цитат', 'цити', 'процит', 'фразеологизм', 'афоризм', 'мотиви', 'мотивац']
                 if (d_current['object']['attachments']) or ('geo' in d_current['object']) or any(
@@ -240,9 +311,27 @@ while True:
                         Request('http://api.forismatic.com/api/1.0/?method=getQuote&format=text&lang=ru',
                                 headers={'User-Agent': 'Mozilla/5.0'})).read().decode("utf-8", "replace"))
 
-                response = urlopen('https://api.vk.com/method/messages.send?peer_id=' + str(
-                    peer_id) + '&random_id=' + randuid + '&message=' + message + '&access_token=' + access_token + '&v=' + api_version)
+                options = ['настройки', 'опции', 'options', 'settings']
+                if any(substring in d_current['object']['text'].lower() for substring in options):
+                    settings_flag = True
 
+                print("Message to user: {0}".format(unquote(message)))
+                url = "https://api.vk.com/method/messages.send"
+
+                post_request_params = {
+                    'peer_id': str(peer_id),
+                    'random_id': randuid,
+                    'message': unquote(message),
+                    'access_token': access_token,
+                    'v': api_version
+                }
+                if settings_flag:
+                    post_request_params['keyboard'] = json.dumps(user_settings[peer_id].copy())
+                query_string = urllib.parse.urlencode(post_request_params)
+                data = query_string.encode("ascii")
+
+                response = urlopen(url, data)
+                print(response.read())
                 print()
     ts = d['ts']
     time.sleep(1)
