@@ -120,8 +120,6 @@ def parse_schedule(schedule):
 def get_current_pair(peer_id = 0):
     gerzone = timezone('Etc/GMT+6')
     loc_dt = gerzone.localize(datetime.datetime.today()).astimezone(timezone('Etc/GMT+3'))
-    for zone in all_timezones:
-        print(zone)
     #print("local dt: {0}: ".format(loc_dt))
     loc_dt_now = gerzone.localize(datetime.datetime.now()).astimezone(timezone('Etc/GMT+3'))
     #print("local dt now: {0}: ".format(loc_dt_now))
