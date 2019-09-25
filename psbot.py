@@ -71,7 +71,7 @@ def creation_date(path_to_file):
 
 def parse_schedule(schedule):
     global global_schedule
-    last_hour = 100 # It is actually time like 01:00 in int
+    last_hour = 100  # It is actually time like 01:00 ('hhmm'-like numbers) in int
     # Counter to store hours as a list
     h_counter = 0
     day = 0
@@ -117,19 +117,22 @@ def parse_schedule(schedule):
     """
 
 
-def get_current_pair(peer_id = 0):
+def get_current_pair(peer_id=0):
+    # Some nasty time-magic
+    # TODO autodetect correct Moscow time
     gerzone = timezone('Etc/GMT+6')
     loc_dt = gerzone.localize(datetime.datetime.today()).astimezone(timezone('Etc/GMT+3'))
-    #print("local dt: {0}: ".format(loc_dt))
+    # print("local dt: {0}: ".format(loc_dt))
     loc_dt_now = gerzone.localize(datetime.datetime.now()).astimezone(timezone('Etc/GMT+3'))
-    #print("local dt now: {0}: ".format(loc_dt_now))
-    #day = datetime.datetime.today().astimezone(timezone('Europe/Moscow')).weekday()
+    # print("local dt now: {0}: ".format(loc_dt_now))
+    # day = datetime.datetime.today().astimezone(timezone('Europe/Moscow')).weekday()
     day = loc_dt.weekday()
+    # class duration: 1 h 30 min
     delta = datetime.timedelta(0, 0, 0, 0, 30, 1)
     class_current_flag = False
-    s_message = day_of_week[loc_dt.weekday()] + '\n' +\
+    s_message = day_of_week[loc_dt.weekday()] + '\n' + \
                 loc_dt.strftime(
-            "%Y-%m-%d %H.%M.%S")
+                    "%Y-%m-%d %H.%M.%S")
     if not day < len(global_schedule):
         s_message = s_message + "\nВыходной день, пар нет"
     else:
@@ -137,7 +140,8 @@ def get_current_pair(peer_id = 0):
             class_hour = int(str(hour['start_time'])[:-2])
             class_minute = int(str(hour['start_time'])[-2:])
             class_start = datetime.time(class_hour, class_minute)
-            current_delta = loc_dt_now.replace(tzinfo=None) - datetime.datetime.combine(loc_dt.replace(tzinfo=None), class_start)
+            current_delta = loc_dt_now.replace(tzinfo=None) - datetime.datetime.combine(loc_dt.replace(tzinfo=None),
+                                                                                        class_start)
             if current_delta < delta and current_delta > -delta:
                 td1 = datetime.timedelta(0, 0, 0, 0, class_minute, class_hour)
                 beginning = ':'.join(str(td1).split(':')[:2])
@@ -152,14 +156,21 @@ def get_current_pair(peer_id = 0):
                     if k != 'start_time':
                         if k in user_filters[peer_id] or peer_id == 0 or peer_id not in user_filters:
                             s_message = s_message + "\n{0}: {1}".format(k, v)
+                            print("s_message: \n{0}".format(s_message))
                             class_current_flag = True
         if not class_current_flag:
             s_message = s_message + "\nУчебный день окончен"
 
     return quote(s_message)
 
+
 # Connecting to Long Poll server
+try:
+    f = open(dirname(abspath(__file__)) + "/access_token", "r")
+except IOError:
+    print('Error: File does not appear to exist.')
 f = open(dirname(abspath(__file__)) + "/access_token", "r")
+# 0a byte is eof
 access_token = f.read().rstrip('\x0a')
 f.close()
 api_version = '5.101'
@@ -185,13 +196,16 @@ download_path = get_download_path(file_path_separator)
 user_response = urlopen(
     'https://api.vk.com/method/docs.search?q=' + q + '&access_token=' + access_token + '&v=' + api_version + "&search_own&count=" + count)
 ur = json.loads(str(user_response.read(), 'utf-8'))
-# print(ur)
+print(ur)
 
 # Filtering search results
 print("Searching schedule files (.docx) in {0} results...".format(len(ur['response']['items'])))
 f_counter = 0
 fd_counter = 0
+print("My group id: {0}".format(group_id))
 for item in ur['response']['items']:
+    # if item['owner_id'] < 0:
+    # print("Group doc id: {0}".format(item['owner_id']))
     if item['owner_id'] == -int(group_id):
         print("Title: {0}".format(item['title']))
         value = datetime.datetime.fromtimestamp(item['date'])
@@ -225,7 +239,6 @@ print("Saving files to: {0}".format(download_path))
 get_current_pair()
 print("Parsed schedule for groups: \n{0}".format(groups))
 
-
 empty_keyboard = {
     'one_time': True,
     'buttons': [[{}]]
@@ -258,8 +271,9 @@ while True:
     if 'updates' in d:
         for d_current in d['updates']:
             if d_current['type'] == "message_new":
-                #print(r)
-                message = quote('Список доступных комманд:\n\n - \"Какая сейчас пара?\"\n - "Настройки"\n - \"Процитируй что-нибудь\"')
+                print(r)
+                message = quote(
+                    'Список доступных комманд:\n\n - \"Какая сейчас пара?\"\n - "Настройки"\n - \"Процитируй что-нибудь\"')
                 peer_id = d_current['object']['peer_id']
                 print('Peer id: ' + str(peer_id))
 
@@ -274,20 +288,32 @@ while True:
                     if 'command' in json.loads(d_current['object']['payload']):
                         message = "Выберите группы для отображения расписания"
                         break
+                    print("FUCKING SHIiiittt: {0}".format(user_settings[peer_id]))
+                    user_settings_copy = user_settings.copy()
                     for row in user_settings[peer_id]['buttons']:
                         for button in row:
                             l_group = json.loads(button['action']['payload'])['button']
                             r_group = json.loads(d_current['object']['payload'])['button']
                             if l_group == r_group:
+                                print("PEEEEEEEEERRRRR: {0}".format(peer_id))
                                 if button['color'] != 'primary':
+                                    print("Peer id: {0}; Button color: {1}".format(peer_id, button['color']))
+                                    print(user_settings)
                                     button['color'] = 'primary'
+                                    print("Peer id: {0}; Button color: {1}".format(peer_id, button['color']))
+                                    print(user_settings)
                                     message = quote("Включено отображение расписания группы {0}".format(l_group))
                                     user_filters[peer_id].append(l_group)
                                 else:
+                                    print("Peer id: {0}; Button color: {1}".format(peer_id, button['color']))
+                                    print(user_settings)
                                     button['color'] = 'secondary'
+                                    print("Peer id: {0}; Button color: {1}".format(peer_id, button['color']))
+                                    print(user_settings)
                                     message = quote("Отключено отображение расписания группы {0}".format(r_group))
                                     if l_group in user_filters[peer_id]:
                                         user_filters[peer_id].remove(l_group)
+                print("USER FILTERS: {0}".format(user_filters))
 
                 uid = str(d_current['object']['from_id'])
                 randuid = str(random.randint(0, 2147483647))
@@ -334,7 +360,9 @@ while True:
                     'v': api_version
                 }
                 if settings_flag:
+                    print("SENDING SETTINGS:\nPeer id: {0}\n{1}".format(peer_id, user_settings[peer_id]))
                     post_request_params['keyboard'] = json.dumps(user_settings[peer_id].copy())
+                    print("Global user settings:\n{0}".format(user_settings))
                 query_string = urllib.parse.urlencode(post_request_params)
                 data = query_string.encode("ascii")
 
