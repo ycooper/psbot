@@ -4,6 +4,7 @@ import urllib.parse
 from os.path import dirname, abspath
 from pytz import timezone
 from pytz import all_timezones
+from copy import deepcopy
 import json
 import time
 import datetime
@@ -168,7 +169,7 @@ def get_current_pair(peer_id=0):
 try:
     f = open(dirname(abspath(__file__)) + "/access_token", "r")
 except IOError:
-    print('Error: File does not appear to exist.')
+    print('Error: File does not appear to exist. Create a file named access_token and put your access token into it')
 f = open(dirname(abspath(__file__)) + "/access_token", "r")
 # 0a byte is eof
 access_token = f.read().rstrip('\x0a')
@@ -243,7 +244,8 @@ empty_keyboard = {
     'one_time': True,
     'buttons': [[{}]]
 }
-keyboard = empty_keyboard.copy()
+print("EMPTY KEYBOARD INITIAL:\n{0}".format(empty_keyboard))
+keyboard = deepcopy(empty_keyboard)
 keyboard['one_time'] = False
 g_counter = 0
 row_counter = 0
@@ -262,6 +264,7 @@ for group in groups:
         'color': 'secondary'
     })
     g_counter += 1
+print("EMPTY KEYBOARD FINAL:\n{0}".format(empty_keyboard))
 
 while True:
     response = urlopen(server + '?act=a_check&key=' + key + '&ts=' + ts + '&wait=' + wait)
@@ -271,6 +274,7 @@ while True:
     if 'updates' in d:
         for d_current in d['updates']:
             if d_current['type'] == "message_new":
+                print()
                 print(r)
                 message = quote(
                     'Список доступных комманд:\n\n - \"Какая сейчас пара?\"\n - "Настройки"\n - \"Процитируй что-нибудь\"')
@@ -279,7 +283,11 @@ while True:
 
                 # Checking user keyboard settings
                 if peer_id not in user_settings:
-                    user_settings[peer_id] = keyboard
+                    print("Peer {0} doesn't have settings".format(peer_id))
+                    user_settings[peer_id] = deepcopy(keyboard)
+                    #user_settings[peer_id] = deepcopy(empty_keyboard)
+                    #user_settings[peer_id]['one_time'] = False
+                    print("Current settings for this peer: \n{0}".format(user_settings[peer_id]))
                     user_filters[peer_id] = []
                 # Updating keyboard settings from keyboard event
                 if 'payload' in d_current['object']:
@@ -288,19 +296,20 @@ while True:
                     if 'command' in json.loads(d_current['object']['payload']):
                         message = "Выберите группы для отображения расписания"
                         break
-                    print("FUCKING SHIiiittt: {0}".format(user_settings[peer_id]))
-                    user_settings_copy = user_settings.copy()
+                    print("Current user_settings state: {0}".format(user_settings[peer_id]))
+                    user_settings_copy = deepcopy(user_settings)
                     for row in user_settings[peer_id]['buttons']:
                         for button in row:
                             l_group = json.loads(button['action']['payload'])['button']
                             r_group = json.loads(d_current['object']['payload'])['button']
                             if l_group == r_group:
-                                print("PEEEEEEEEERRRRR: {0}".format(peer_id))
+                                print("Peer id: {0}".format(peer_id))
+                                print("Button processed: {0}".format(l_group))
                                 if button['color'] != 'primary':
-                                    print("Peer id: {0}; Button color: {1}".format(peer_id, button['color']))
+                                    print("Peer id: {0}; Button color was: {1}".format(peer_id, button['color']))
                                     print(user_settings)
                                     button['color'] = 'primary'
-                                    print("Peer id: {0}; Button color: {1}".format(peer_id, button['color']))
+                                    print("Peer id: {0}; Button color became: {1}".format(peer_id, button['color']))
                                     print(user_settings)
                                     message = quote("Включено отображение расписания группы {0}".format(l_group))
                                     user_filters[peer_id].append(l_group)
@@ -313,7 +322,7 @@ while True:
                                     message = quote("Отключено отображение расписания группы {0}".format(r_group))
                                     if l_group in user_filters[peer_id]:
                                         user_filters[peer_id].remove(l_group)
-                print("USER FILTERS: {0}".format(user_filters))
+                print("USER FILTERS: {0}\n".format(user_filters))
 
                 uid = str(d_current['object']['from_id'])
                 randuid = str(random.randint(0, 2147483647))
@@ -361,7 +370,7 @@ while True:
                 }
                 if settings_flag:
                     print("SENDING SETTINGS:\nPeer id: {0}\n{1}".format(peer_id, user_settings[peer_id]))
-                    post_request_params['keyboard'] = json.dumps(user_settings[peer_id].copy())
+                    post_request_params['keyboard'] = json.dumps(deepcopy(user_settings[peer_id]))
                     print("Global user settings:\n{0}".format(user_settings))
                 query_string = urllib.parse.urlencode(post_request_params)
                 data = query_string.encode("ascii")
