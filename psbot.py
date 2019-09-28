@@ -5,6 +5,7 @@ from os.path import dirname, abspath
 from pytz import timezone
 from pytz import all_timezones
 from copy import deepcopy
+from collections import defaultdict
 import json
 import time
 import datetime
@@ -34,7 +35,7 @@ Y                   Y                               Y
 
 file_path_separator = ['/']
 schedule = []
-global_schedule = [[{}]]
+global_schedule = [[defaultdict(list)]]
 day_of_week = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 groups = []
 user_settings = {}
@@ -45,10 +46,10 @@ user_data = {'user_settings': user_settings, 'user_filters': user_filters}
 try:
     settings_file = open(dirname(abspath(__file__)) + "/user_settings", 'rb+')
 except IOError:
+    print("Error opening \'user_settings\' file.")
     settings_file = open(dirname(abspath(__file__)) + "/user_settings", 'wb+')
     settings_file.close()
     settings_file = open(dirname(abspath(__file__)) + "/user_settings", 'rb+')
-    print("Error opening \'user_settings\' file.")
 if os.path.getsize("user_settings") > 0:
     user_data = pickle.load(settings_file)
     user_settings = user_data['user_settings']
@@ -93,34 +94,41 @@ def parse_schedule(schedule):
     # Counter to store hours as a list
     h_counter = 0
     day = 0
-    # print("")
-    global_schedule[0] = [{}]
+    global_schedule[0] = [defaultdict(list)]
+    """
+    print("")
+    print("Global schedule now:\n{0}".format(global_schedule))
+    print("Schedule now:\n{0}".format(schedule))
+    """
     for hour in schedule:
-        # print(hour)
+        #print(hour)
         for key, value in hour.items():
             if key == '':
                 """
                 print("")
-                print("Hours in file: {0}".format(str(value)[:-2]))
+                print("Current hour in file: {0}".format(str(value)[:-2]))
                 print("Last hour: {0}".format(str(last_hour)[:-2]))
                 print("Day: {0}".format(day))
                 """
+                # Current hour becomes less than last hour on new day
                 if int(str(value)[:-2]) < int(str(last_hour)[:-2]):
                     day += 1
                     h_counter = 0
-                    # print("NEW DAY #{0}".format(day))
-                    global_schedule.append([{}])
+                    #print("NEW DAY #{0}".format(day))
+                    global_schedule.append([defaultdict(list)])
                 elif int(str(value)[:-2]) > int(str(last_hour)[:-2]):
-                    # print("HOUR INCREASED")
+                    #print("HOUR INCREASED")
                     h_counter += 1
-                    global_schedule[day].append({})
-                global_schedule[day][h_counter]['start_time'] = value
-                # print("Writing start time: {0}".format(global_schedule[day][h_counter]))
+                    global_schedule[day].append(defaultdict(list))
+                if len(global_schedule[day][h_counter]['start_time']) == 0:
+                    global_schedule[day][h_counter]['start_time'].append(value)
+                #print("Writing start time: {0}".format(global_schedule[day][h_counter]))
                 last_hour = value
             else:
                 if key not in groups:
                     groups.append(key)
-                global_schedule[day][h_counter][key] = value
+                #global_schedule[day][h_counter][key] = value
+                global_schedule[day][h_counter][key].append(value)
                 """
                 print("{0} на паре: {1}".format(key, value))
                 print("Hour counter: {0}".format(h_counter))
@@ -133,7 +141,6 @@ def parse_schedule(schedule):
     print("global_schedule:")
     print(global_schedule)
     """
-
 
 def get_current_pair(peer_id=0):
     # Some nasty time-magic
@@ -151,12 +158,19 @@ def get_current_pair(peer_id=0):
     s_message = day_of_week[loc_dt.weekday()] + '\n' + \
                 loc_dt.strftime(
                     "%Y-%m-%d %H.%M.%S")
+    # Determins whether week is nominator or denominator
+    nominator_index = 0
+    if datetime.date.today().isocalendar()[1] % 2 == 1:
+        nominator_index = 0
+    else:
+        nominator_index = -1
+    print("\nWeek number {0}\nNominator index {1}".format(datetime.date.today().isocalendar()[1], nominator_index))
     if not day < len(global_schedule):
         s_message = s_message + "\nВыходной день, пар нет"
     else:
         for hour in global_schedule[day]:
-            class_hour = int(str(hour['start_time'])[:-2])
-            class_minute = int(str(hour['start_time'])[-2:])
+            class_hour = int(str(hour['start_time'][0])[:-2])
+            class_minute = int(str(hour['start_time'][0])[-2:])
             class_start = datetime.time(class_hour, class_minute)
             current_delta = loc_dt_now.replace(tzinfo=None) - datetime.datetime.combine(loc_dt.replace(tzinfo=None),
                                                                                         class_start)
@@ -173,7 +187,7 @@ def get_current_pair(peer_id=0):
                 for k, v in hour.items():
                     if k != 'start_time':
                         if k in user_filters[peer_id] or peer_id == 0 or peer_id not in user_filters:
-                            s_message = s_message + "\n{0}: {1}".format(k, v)
+                            s_message = s_message + "\n{0}: {1}".format(k, v[nominator_index])
                             print("s_message: \n{0}".format(s_message))
                             class_current_flag = True
         if not class_current_flag:
@@ -360,7 +374,7 @@ while True:
                     for att in d_current['object']['attachments']:
                         print(att['type'])
 
-                current_class = ['пара', 'сейчас', 'сколько врем', 'который час']
+                current_class = ['пара', 'сейчас', 'сколько врем', 'который час', 'пары']
                 if any(substring in d_current['object']['text'].lower() for substring in current_class):
                     message = get_current_pair(peer_id)
 
