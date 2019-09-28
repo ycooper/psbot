@@ -10,6 +10,7 @@ import time
 import datetime
 import random
 import os
+import pickle
 
 from docx_parser import get_schedule
 
@@ -38,6 +39,22 @@ day_of_week = ['Понедельник', 'Вторник', 'Среда', 'Чет
 groups = []
 user_settings = {}
 user_filters = {}
+user_data = {'user_settings': user_settings, 'user_filters': user_filters}
+
+# Settings de-serialisation
+try:
+    settings_file = open("user_settings", 'rb+')
+except IOError:
+    settings_file = open("user_settings", 'wb+')
+    settings_file.close()
+    settings_file = open("user_settings", 'rb+')
+    print("Error opening \'user_settings\' file.")
+if os.path.getsize("user_settings") > 0:
+    user_data = pickle.load(settings_file)
+    user_settings = user_data['user_settings']
+    user_filters = user_data['user_filters']
+    print("Reading user data from file:\n{0}\n".format(user_data))
+settings_file.close()
 
 
 def get_download_path(separator):
@@ -244,7 +261,6 @@ empty_keyboard = {
     'one_time': True,
     'buttons': [[{}]]
 }
-print("EMPTY KEYBOARD INITIAL:\n{0}".format(empty_keyboard))
 keyboard = deepcopy(empty_keyboard)
 keyboard['one_time'] = False
 g_counter = 0
@@ -264,7 +280,6 @@ for group in groups:
         'color': 'secondary'
     })
     g_counter += 1
-print("EMPTY KEYBOARD FINAL:\n{0}".format(empty_keyboard))
 
 while True:
     response = urlopen(server + '?act=a_check&key=' + key + '&ts=' + ts + '&wait=' + wait)
@@ -285,8 +300,6 @@ while True:
                 if peer_id not in user_settings:
                     print("Peer {0} doesn't have settings".format(peer_id))
                     user_settings[peer_id] = deepcopy(keyboard)
-                    #user_settings[peer_id] = deepcopy(empty_keyboard)
-                    #user_settings[peer_id]['one_time'] = False
                     print("Current settings for this peer: \n{0}".format(user_settings[peer_id]))
                     user_filters[peer_id] = []
                 # Updating keyboard settings from keyboard event
@@ -322,6 +335,14 @@ while True:
                                     message = quote("Отключено отображение расписания группы {0}".format(r_group))
                                     if l_group in user_filters[peer_id]:
                                         user_filters[peer_id].remove(l_group)
+                try:
+                    settings_file = open("user_settings", 'wb+')
+                except IOError:
+                    print("Error opening \'user_settings\' file.")
+                user_data = {'user_settings': user_settings, 'user_filters': user_filters}
+                pickle.dump(user_data, settings_file, pickle.HIGHEST_PROTOCOL)
+                print("Writing user data to file:\n{0}".format(user_data))
+                settings_file.close()
                 print("USER FILTERS: {0}\n".format(user_filters))
 
                 uid = str(d_current['object']['from_id'])
