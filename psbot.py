@@ -43,11 +43,11 @@ user_data = {'user_settings': user_settings, 'user_filters': user_filters}
 
 # Settings de-serialisation
 try:
-    settings_file = open("user_settings", 'rb+')
+    settings_file = open(dirname(abspath(__file__)) + "/user_settings", 'rb+')
 except IOError:
-    settings_file = open("user_settings", 'wb+')
+    settings_file = open(dirname(abspath(__file__)) + "/user_settings", 'wb+')
     settings_file.close()
-    settings_file = open("user_settings", 'rb+')
+    settings_file = open(dirname(abspath(__file__)) + "/user_settings", 'rb+')
     print("Error opening \'user_settings\' file.")
 if os.path.getsize("user_settings") > 0:
     user_data = pickle.load(settings_file)
@@ -336,7 +336,7 @@ while True:
                                     if l_group in user_filters[peer_id]:
                                         user_filters[peer_id].remove(l_group)
                 try:
-                    settings_file = open("user_settings", 'wb+')
+                    settings_file = open(dirname(abspath(__file__)) + "/user_settings", 'wb+')
                 except IOError:
                     print("Error opening \'user_settings\' file.")
                 user_data = {'user_settings': user_settings, 'user_filters': user_filters}
