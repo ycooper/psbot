@@ -90,10 +90,10 @@ def creation_date(path_to_file):
 
 def parse_schedule(schedule):
     global global_schedule
-    last_hour = 100  # It is actually time like 01:00 ('hhmm'-like numbers) in int
+    last_hour = 2401  # It is actually time like 01:00 ('hhmm'-like numbers) in int
     # Counter to store hours as a list
     h_counter = 0
-    day = 0
+    day = -1
     global_schedule[0] = [defaultdict(list)]
     """
     print("")
@@ -114,10 +114,10 @@ def parse_schedule(schedule):
                 if int(str(value)[:-2]) < int(str(last_hour)[:-2]):
                     day += 1
                     h_counter = 0
-                    #print("NEW DAY #{0}".format(day))
+                    print("NEW DAY #{0}".format(day))
                     global_schedule.append([defaultdict(list)])
                 elif int(str(value)[:-2]) > int(str(last_hour)[:-2]):
-                    #print("HOUR INCREASED")
+                    print("HOUR INCREASED")
                     h_counter += 1
                     global_schedule[day].append(defaultdict(list))
                 if len(global_schedule[day][h_counter]['start_time']) == 0:
@@ -127,7 +127,9 @@ def parse_schedule(schedule):
             else:
                 if key not in groups:
                     groups.append(key)
+                    print("Appended {0} to groups list".format(key))
                 #global_schedule[day][h_counter][key] = value
+                print("Appending value for {0}: {1}".format(key,value))
                 global_schedule[day][h_counter][key].append(value)
                 """
                 print("{0} на паре: {1}".format(key, value))
@@ -138,9 +140,8 @@ def parse_schedule(schedule):
                 print("Attempting to write global_schedule[{0}][{1}]".format(day, h_counter))
                 print("")
         print("")
-    print("global_schedule:")
-    print(global_schedule)
     """
+    print("Global schedule\n{0}".format(global_schedule))
 
 def get_current_pair(peer_id=0):
     # Some nasty time-magic
@@ -154,6 +155,7 @@ def get_current_pair(peer_id=0):
     day = loc_dt.weekday()
     # class duration: 1 h 30 min
     delta = datetime.timedelta(0, 0, 0, 0, 30, 1)
+    first_class = datetime.time(9,0)
     class_current_flag = False
     s_message = day_of_week[loc_dt.weekday()] + '\n' + \
                 loc_dt.strftime(
@@ -168,7 +170,10 @@ def get_current_pair(peer_id=0):
     if not day < len(global_schedule):
         s_message = s_message + "\nВыходной день, пар нет"
     else:
+        first_class = datetime.time(int(str(global_schedule[day][0]['start_time'][0])[:-2]),
+                                    int(str(global_schedule[day][0]['start_time'][0])[-2:]))
         for hour in global_schedule[day]:
+            print('Current class start time:\n{0}'.format(hour['start_time'][0]))
             class_hour = int(str(hour['start_time'][0])[:-2])
             class_minute = int(str(hour['start_time'][0])[-2:])
             class_start = datetime.time(class_hour, class_minute)
@@ -191,7 +196,13 @@ def get_current_pair(peer_id=0):
                             print("s_message: \n{0}".format(s_message))
                             class_current_flag = True
         if not class_current_flag:
-            s_message = s_message + "\nУчебный день окончен"
+            if loc_dt_now.time() < first_class:
+                delta_to_class = datetime.datetime.combine(datetime.date.min, first_class) -\
+                                 datetime.datetime.combine(datetime.date.min, loc_dt_now.time())
+                s_message = s_message + "\nДо начала учебного дня {0}".\
+                    format(':'.join(str(delta_to_class).split(':')[:2]))
+            else:
+                s_message = s_message + "\nУчебный день окончен"
 
     return quote(s_message)
 
@@ -221,7 +232,7 @@ ts = d['response']['ts']
 wait = '25'
 
 # Searcing vk for schedule in group
-q = quote("расписание")
+q = quote("расписание пс")
 doc_type = str(1)
 count = str(1000)
 download_path = get_download_path(file_path_separator)
@@ -268,8 +279,8 @@ print()
 print("{0} schedule files found".format(f_counter))
 print("{0} files were downloaded".format(fd_counter))
 print("Saving files to: {0}".format(download_path))
-get_current_pair()
 print("Parsed schedule for groups: \n{0}".format(groups))
+get_current_pair()
 
 empty_keyboard = {
     'one_time': True,
