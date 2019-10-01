@@ -143,7 +143,7 @@ def parse_schedule(schedule):
     """
     print("Global schedule\n{0}".format(global_schedule))
 
-def get_current_pair(peer_id=0):
+def get_current_pair(peer_id=0, print_all=False):
     # Some nasty time-magic
     # TODO autodetect correct Moscow time
     gerzone = timezone('Etc/GMT+6')
@@ -161,17 +161,24 @@ def get_current_pair(peer_id=0):
                 loc_dt.strftime(
                     "%Y-%m-%d %H.%M.%S")
     # Determins whether week is nominator or denominator
+    nominates = ['числитель', 'знаменатель']
     nominator_index = 0
-    if datetime.date.today().isocalendar()[1] % 2 == 1:
+    nominator_delta = datetime.date.today() - datetime.date(datetime.date.today().year, 9, 1)
+    print("Nominator delta:\n{0}".format(nominator_delta))
+    week_number = datetime.date.today().isocalendar()[1] -\
+                  datetime.date(datetime.date.today().year, 9, 1).isocalendar()[1]
+    if week_number % 2 == 1:
         nominator_index = 0
     else:
         nominator_index = -1
-    print("\nWeek number {0}\nNominator index {1}".format(datetime.date.today().isocalendar()[1], nominator_index))
+    print("\nWeek number {0}\nNominator index {1}".format(week_number, nominator_index))
+    s_message = s_message + "\nУчебная неделя № {0}, {1}".format(week_number, nominates[nominator_index])
     if not day < len(global_schedule):
         s_message = s_message + "\nВыходной день, пар нет"
     else:
         first_class = datetime.time(int(str(global_schedule[day][0]['start_time'][0])[:-2]),
                                     int(str(global_schedule[day][0]['start_time'][0])[-2:]))
+
         for hour in global_schedule[day]:
             print('Current class start time:\n{0}'.format(hour['start_time'][0]))
             class_hour = int(str(hour['start_time'][0])[:-2])
@@ -179,11 +186,16 @@ def get_current_pair(peer_id=0):
             class_start = datetime.time(class_hour, class_minute)
             current_delta = loc_dt_now.replace(tzinfo=None) - datetime.datetime.combine(loc_dt.replace(tzinfo=None),
                                                                                         class_start)
-            if current_delta < delta and current_delta > -delta:
-                td1 = datetime.timedelta(0, 0, 0, 0, class_minute, class_hour)
-                beginning = ':'.join(str(td1).split(':')[:2])
-                td2 = datetime.timedelta(0, 0, 0, 0, class_minute + 30, class_hour + 1)
-                ending = ':'.join(str(td2).split(':')[:2])
+            td1 = datetime.timedelta(0, 0, 0, 0, class_minute, class_hour)
+            beginning = ':'.join(str(td1).split(':')[:2])
+            td2 = datetime.timedelta(0, 0, 0, 0, class_minute + 30, class_hour + 1)
+            ending = ':'.join(str(td2).split(':')[:2])
+            if print_all:
+                s_message = s_message + "\n\n[{0} - {1}]".format(beginning, ending)
+                for k, v in hour.items():
+                    if k != 'start_time' and k in user_filters[peer_id] or peer_id == 0 or peer_id not in user_filters:
+                        s_message = s_message + "\n{0}: {1}".format(k, v[nominator_index])
+            if current_delta < delta and current_delta > -delta and not print_all:
                 if current_delta >= datetime.timedelta(0):
                     s_message = s_message + "\nТекущая пара ({0} - {1}):".format(beginning, ending)
                 else:
@@ -385,9 +397,14 @@ while True:
                     for att in d_current['object']['attachments']:
                         print(att['type'])
 
-                current_class = ['пара', 'сейчас', 'сколько врем', 'который час', 'пары']
+                current_class = ['пара', 'сейчас', 'сколько врем', 'который час']
                 if any(substring in d_current['object']['text'].lower() for substring in current_class):
                     message = get_current_pair(peer_id)
+
+                today_class = ['день', 'сегодня', 'пары']
+                if any(substring in d_current['object']['text'].lower() for substring in today_class):
+                    message = get_current_pair(peer_id, True)
+
 
                 citation = ['цитат', 'цити', 'процит', 'фразеологизм', 'афоризм', 'мотиви', 'мотивац']
                 if (d_current['object']['attachments']) or ('geo' in d_current['object']) or any(
